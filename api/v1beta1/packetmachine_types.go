@@ -87,14 +87,14 @@ type PacketMachineSpec struct {
 	// +optional
 	Tags Tags `json:"tags,omitempty"`
 
-	// Ports is an optional set of configurations for configuring layer2 seetings in a machine. 
+	// NetworkPorts is an optional set of configurations for configuring layer2 seetings in a machine. 
 	// +optional
-	Ports []Port `json:"ports,omitempty"`
+	NetworkPorts []*Port `json:"ports,omitempty"`
 	// List of Routes to be configured on the Packet Machine
     // +optional
-	Routes      []RouteSpec     `json:"routes,omitempty"`
+	Routes      []*RouteSpec     `json:"routes,omitempty"`
 }
-// Port defines the Layer2(VLAN) Configuration that needs to be done on a port (eg: bond0)
+// Port defines the Layer2(VLAN) Configuration that needs to be done on a port (eg: bond0).
 type Port struct {
 	// name of the port e.g bond0,eth0 and eth1 for 2 NIC servers.
 	Name string `json:"name"`
@@ -106,6 +106,7 @@ type Port struct {
     Networks []Network `json:"networks"`	
 }
 
+// Network defines the network configuration for a port.
 type Network struct {
     // network ip address range to reserve for these ports.
     // for eg: can be carved out of a VRF IP Range.
