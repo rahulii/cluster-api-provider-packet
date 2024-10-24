@@ -111,13 +111,14 @@ type CreateDeviceRequest struct {
 }
 
 type IPAddressCfg struct {
-	Netmask  string
-	VXLAN    int
-	Address  string
-	PortName string
-	Layer2   bool
-	Bonded   bool
-	Routes   []layer2.RouteSpec
+	Netmask     string
+	VXLAN       int
+	Address     string
+	PortName    string
+	Layer2      bool
+	Bonded      bool
+	Routes      []layer2.RouteSpec
+	AddressType corev1.NodeAddressType
 }
 
 // NewDevice creates a new device.
@@ -141,8 +142,15 @@ func (p *Client) NewDevice(ctx context.Context, req CreateDeviceRequest) (*metal
 	userData := string(userDataRaw)
 	userDataValues := map[string]interface{}{
 		"kubernetesVersion": ptr.Deref(req.MachineScope.Machine.Spec.Version, ""),
+		"IPAddress":         "",
 	}
 
+	for _, ipAddr := range req.IPAddresses {
+		if ipAddr.AddressType == corev1.NodeInternalIP && ipAddr.Layer2 {
+			userDataValues["IPAddress"] = ipAddr.Address
+			break
+		}
+	}
 	tags := make([]string, 0, len(packetMachineSpec.Tags)+len(req.ExtraTags))
 	copy(tags, packetMachineSpec.Tags)
 	tags = append(tags, req.ExtraTags...)

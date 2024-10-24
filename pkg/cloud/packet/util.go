@@ -18,6 +18,8 @@ package packet
 
 import (
 	"fmt"
+
+	corev1 "k8s.io/api/core/v1"
 )
 
 const (
@@ -74,4 +76,16 @@ func DefaultCreateTags(namespace, name, clusterName string) []string {
 
 func IPAddressClaimName(machineName string, portIndex, networkIndex int) string {
 	return fmt.Sprintf("%s-port-%d-network-%d", machineName, portIndex, networkIndex)
+}
+
+func IPAddressCfgsToNodeAddresses(ipAddrCfg []IPAddressCfg) []corev1.NodeAddress {
+	addrs := make([]corev1.NodeAddress, len(ipAddrCfg))
+
+	for idx, address := range ipAddrCfg {
+		addrs[idx] = corev1.NodeAddress{
+			Address: address.Address,
+			Type:    address.AddressType,
+		}
+	}
+	return addrs
 }

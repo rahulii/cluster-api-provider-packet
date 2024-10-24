@@ -325,7 +325,7 @@ func (r *PacketMachineReconciler) reconcile(ctx context.Context, machineScope *s
 		err                  error
 		controlPlaneEndpoint *metal.IPReservation
 		resp                 *http.Response
-		ipAddrCfg            []packet.IPAddressCfg
+		ipAddrCfgs           []packet.IPAddressCfg
 	)
 
 	if deviceID != "" {
@@ -384,15 +384,20 @@ func (r *PacketMachineReconciler) reconcile(ctx context.Context, machineScope *s
 			}
 		}
 
-		ipAddrCfg, err = getIPAddressCfg(ctx, r.Client, machineScope.PacketMachine)
+		ipAddrCfgs, err = getIPAddressCfg(ctx, r.Client, machineScope.PacketMachine)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
 
+		l2Addresses := packet.IPAddressCfgsToNodeAddresses(ipAddrCfgs)
+
+		addrs = append(addrs, l2Addresses...)
+		machineScope.SetAddresses(addrs)
+
 		createDeviceReq := packet.CreateDeviceRequest{
 			MachineScope: machineScope,
 			ExtraTags:    packet.DefaultCreateTags(machineScope.Namespace(), machineScope.Machine.Name, machineScope.Cluster.Name),
-			IPAddresses:  ipAddrCfg,
+			IPAddresses:  ipAddrCfgs,
 		}
 
 		// when a node is a control plane node we need the elastic IP
@@ -459,8 +464,17 @@ func (r *PacketMachineReconciler) reconcile(ctx context.Context, machineScope *s
 		}
 	}
 
+	ipAddrCfgs, err = getIPAddressCfg(ctx, r.Client, machineScope.PacketMachine)
+	if err != nil {
+		return ctrl.Result{}, err
+	}
+
+	l2Addresses := packet.IPAddressCfgsToNodeAddresses(ipAddrCfgs)
+
 	deviceAddr := r.PacketClient.GetDeviceAddresses(dev)
-	machineScope.SetAddresses(append(addrs, deviceAddr...))
+	addrs = append(addrs, deviceAddr...)
+	addrs = append(addrs, l2Addresses...)
+	machineScope.SetAddresses(addrs)
 
 	// Proceed to reconcile the PacketMachine state.
 	var result reconcile.Result
@@ -528,12 +542,13 @@ func (r *PacketMachineReconciler) reconcile(ctx context.Context, machineScope *s
 
 		// once the network configuration has been successful, we can call the APIs to set the port configuration to layer2/bonded/bound VXLAN to port.
 		// reconstruct ipAddrCfg as earlier it was done when device was created first. During later reconciliations, this might be nil and we need to reconstruct it.
-		ipAddrCfg, err = getIPAddressCfg(ctx, r.Client, machineScope.PacketMachine)
+		ipAddrCfgs, err = getIPAddressCfg(ctx, r.Client, machineScope.PacketMachine)
 		if err != nil {
 			return ctrl.Result{}, err
 		}
-		if len(ipAddrCfg) > 0 {
-			if err := r.reconcilePortConfigurations(ctx, *dev.Id, ipAddrCfg); err != nil {
+
+		if len(ipAddrCfgs) > 0 {
+			if err := r.reconcilePortConfigurations(ctx, *dev.Id, ipAddrCfgs); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to set port configuration: %w", err)
 			}
 		}
@@ -827,13 +842,14 @@ func getIPAddressCfg(ctx context.Context, client client.Client, machine *infrav1
 			}
 
 			ipaddrCfgs = append(ipaddrCfgs, packet.IPAddressCfg{
-				VXLAN:    network.VXLAN,
-				Address:  ipAddr.Spec.Address,
-				Netmask:  net.IP(net.CIDRMask(ipAddr.Spec.Prefix, 32)).String(),
-				PortName: port.Name,
-				Layer2:   port.Layer2,
-				Bonded:   port.Bonded,
-				Routes:   routes,
+				VXLAN:       network.VXLAN,
+				Address:     ipAddr.Spec.Address,
+				Netmask:     net.IP(net.CIDRMask(ipAddr.Spec.Prefix, 32)).String(),
+				PortName:    port.Name,
+				Layer2:      port.Layer2,
+				Bonded:      port.Bonded,
+				Routes:      routes,
+				AddressType: network.AddressType,
 			})
 			boundClaims++
 		}
@@ -888,15 +904,15 @@ func (r *PacketMachineReconciler) reconcilePortConfigurations(ctx context.Contex
 	}
 
 	// Collect all desired VXLANs
-    desiredVXLANs := make(map[string][]int32)
-    for _, config := range desiredConfigs {
-        // fetch the port ID 
+	desiredVXLANs := make(map[string][]int32)
+	for _, config := range desiredConfigs {
+		// fetch the port ID
 		portID, err := getMetalPortID(config.PortName, device.NetworkPorts)
 		if portID == nil || err != nil {
 			return fmt.Errorf("failed to get port ID for %s: %w", config.PortName, err)
 		}
 		desiredVXLANs[*portID] = append(desiredVXLANs[*portID], int32(config.VXLAN))
-    }
+	}
 
 	if err := r.reconcileVXLAN(ctx, desiredVXLANs); err != nil {
 		return err
@@ -929,9 +945,9 @@ func (r *PacketMachineReconciler) reconcilePortConfig(ctx context.Context, netwo
 }
 
 func (r *PacketMachineReconciler) reconcileVXLAN(ctx context.Context, desiredConfig map[string][]int32) error {
-    log := ctrl.LoggerFrom(ctx)
+	log := ctrl.LoggerFrom(ctx)
 
-    for portID, vxlanList := range desiredConfig {
+	for portID, vxlanList := range desiredConfig {
 		currentVXLANs, err := r.getCurrentVXLANAssignments(ctx, portID)
 		if err != nil {
 			return err

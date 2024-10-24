@@ -29,6 +29,7 @@ spec:
           kubeletExtraArgs:
             cloud-provider: external
             provider-id: equinixmetal://{{ `{{ v1.instance_id }}` }}
+            node-ip: "{{ .IPAddress }}"
       preKubeadmCommands:
       - |
         sed -ri '/\sswap\s/s/^#?/#/' /etc/fstab
@@ -145,6 +146,7 @@ spec:
         kubeletExtraArgs:
           cloud-provider: external
           provider-id: equinixmetal://{{ `{{ v1.instance_id }}` }}
+          node-ip: "{{ .IPAddress }}"
     joinConfiguration:
       nodeRegistration:
         ignorePreflightErrors:
@@ -152,6 +154,7 @@ spec:
         kubeletExtraArgs:
           cloud-provider: external
           provider-id: equinixmetal://{{ `{{ v1.instance_id }}` }}
+          node-ip: "{{ .IPAddress }}"
     postKubeadmCommands:
     - |
       cat <<EOF >> /etc/network/interfaces

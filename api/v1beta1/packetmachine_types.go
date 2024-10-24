@@ -56,7 +56,6 @@ const (
 
 	Layer2NetworkConfigurationConditionSuccess = "Layer2NetworkConfigurationSuccess"
 	Layer2NetworkConfigurationConditionFailed  = "Layer2NetworkConfigurationFailed"
-
 )
 
 const (
@@ -147,7 +146,7 @@ type Network struct {
 	AddressFromPool corev1.TypedLocalObjectReference `json:"addressFromPool,omitempty"`
 	// AddressType is the type of address to assign to the machine. It can be either Internal or External.
 	// kubebuilder:validation:Enum=Internal;External
-	AddressType string `json:"addressType,omitempty"`
+	AddressType corev1.NodeAddressType `json:"addressType,omitempty"`
 	// List of Routes to be configured on the Packet Machine
 	// +optional
 	Routes []*RouteSpec `json:"routes,omitempty"`
